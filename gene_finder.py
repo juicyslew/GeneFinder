@@ -9,8 +9,9 @@ Code To Find Genes
 import random
 import math
 from amino_acids import aa, codons, aa_table   # you may find these useful
-from load import load_seq
-
+from load import load_seq, load_nitrogenase_seq, load_metagenome
+nitrogenase = load_nitrogenase_seq()
+metagenome = load_metagenome()
 
 def shuffle_string(s):
     """Shuffles the characters in the input string
@@ -38,7 +39,6 @@ def get_complement(nucleotide):
         return 'G'
     if(nucleotide == 'G'):
         return 'C'
-    pass
 
 
 def get_reverse_complement(dna):
@@ -73,20 +73,20 @@ def rest_of_ORF(dna):
     """
     active = False
     i = 0
-    ORFLeft = ''
+    ORFLeft = '' #Instantiate ORF
     while i < len(dna):
-        nucleo = dna[i:i+3]
-        if active == True or nucleo == 'ATG':
+        nucleo = dna[i:i+3] #check groups of 3 letters
+        if active == True or nucleo == 'ATG':  #if not active then only activate when "ATG" is found, after that stay active
             active = True
-            if nucleo == 'TAG' or nucleo == 'TAA' or nucleo == 'TGA':
+            if nucleo == 'TAG' or nucleo == 'TAA' or nucleo == 'TGA': #stop ORF
                 active = False
-                return [ORFLeft,i]
-            ORFLeft = ORFLeft + nucleo
+                return [ORFLeft,i] # Return ORF
+            ORFLeft = ORFLeft + nucleo #add new nucleus to ORF
         i+=3
     if ORFLeft != '':
-        return [ORFLeft,i]
+        return [ORFLeft,i] #return orf and length
     else:
-        return [None, i]
+        return [None, i] #return None and length (solely to fit return style)
 
 
 def find_all_ORFs_oneframe(dna):
@@ -106,10 +106,10 @@ def find_all_ORFs_oneframe(dna):
     i=0
     while i<len(dna):
         newOrf = rest_of_ORF(dna[i:])
-        if newOrf[0] == None:
+        if newOrf[0] == None: #if none then something went wrong or orf is done, end procees and return list of orfs
             return ORFs
-        i+=newOrf[1]+3
-        ORFs.append(newOrf[0])
+        i+=newOrf[1]+3 #Skip over the orf AND THE STOP CODON
+        ORFs.append(newOrf[0]) #add new orf to list of orfs
     return ORFs
 
 
@@ -130,8 +130,8 @@ def find_all_ORFs(dna):
     ORFs = []
     i = 0
     while i < 3:
-        ORFs = ORFs + find_all_ORFs_oneframe(dna[i:])
-        i+=1
+        ORFs = ORFs + find_all_ORFs_oneframe(dna[i:]) #perform find orfs
+        i+=1 #offset everything by 1 in order to then find nested orfs.
     return ORFs
 
 
@@ -147,8 +147,8 @@ def find_all_ORFs_both_strands(dna):
     """
     otherRevDna = get_reverse_complement(dna)
     dnaORF = find_all_ORFs(dna)
-    otherRevDnaOrf = find_all_ORFs(otherRevDna)
-    return dnaORF + otherRevDnaOrf
+    otherRevDnaOrf = find_all_ORFs(otherRevDna) #Do find all orfs for both forward dna and reverse compliment
+    return dnaORF + otherRevDnaOrf #return list
 
 
 def longest_ORF(dna):
@@ -162,10 +162,10 @@ def longest_ORF(dna):
         return None
     lengs = []
     for Orf in Orfs:
-        lengs.append(len(Orf))
-    maxlen = max(lengs)
-    ind = lengs.index(maxlen) #IMPORTANT NOTE, ONLY RETURNS THE FIRST MAX FOUND, NOT ALL MAXS"""
-    return Orfs[ind]
+        lengs.append(len(Orf)) #make list of orf lengs
+    maxlen = max(lengs) #Find value of longest orf
+    ind = lengs.index(maxlen) #Find index of longest ORF  IMPORTANT NOTE, ONLY RETURNS THE FIRST MAX FOUND, NOT ALL MAXS"""
+    return Orfs[ind] #Return orf at said index
 
 
 def longest_ORF_noncoding(dna, num_trials):
@@ -178,17 +178,17 @@ def longest_ORF_noncoding(dna, num_trials):
     i = 1
     ORFs = [longest_ORF(dna)]
     while i < num_trials:
-        cutlocation = int(len(dna) * random.random())
-        cutpiece = dna[:cutlocation]
-        restpiece = dna[cutlocation:]
-        dna = restpiece + cutpiece
-        ORFs.append(longest_ORF(dna))
+        cutlocation = int(len(dna) * random.random()) #Pick random value within length of dna
+        cutpiece = dna[:cutlocation] #split into piece 1
+        restpiece = dna[cutlocation:] #and piece 2
+        dna = restpiece + cutpiece #reverse order of the two pieces to choose another start location.
+        ORFs.append(longest_ORF(dna)) #Append longest DNA of current orientation
         i+=1
     lengs = []
-    for Orf in ORFs:
-        if Orf == None:
-            continue
-        lengs.append(len(Orf))
+    for Orf in ORFs: #for each orf
+        if Orf == None: #If something went wrong
+            continue #skip this
+        lengs.append(len(Orf)) #append lengths
     maxlen = max(lengs)
     ind = lengs.index(maxlen) #IMPORTANT NOTE, ONLY RETURNS THE FIRST MAX FOUND, NOT ALL MAXS"""
     return ORFs[ind]
@@ -226,9 +226,76 @@ def gene_finder(dna, num_trials):
     """
     return coding_strand_to_AA(dna, num_trials)
 
+def find_substring(substring, string):
+    """
+    >>> find_substring('ABABA', 'EIGHOSHONAGWABFNOGABABFNOABABANONGONOE')
+    True
+    >>> find_substring('WONDERFUL', 'WHAT A TERRIBLE WORLD')
+    False
+    """
+    i = 0
+    while i < len(string):
+        if string[i] == substring[0]:
+            j = 0
+            k = 0
+            while j < len(substring) and i + k < len(string):
+                if string[i+k] != substring[j]:
+                    break
+                j+=1
+                k+=1
+            if j == len(substring):
+                return True
+        i+=1
+    return False
+
+def longest_common_substring(string1, string2, sizeAssume):
+    """
+    >>> longest_common_substring("What a wonderful world", "My life is a wonderful happening", 5)
+    ' a wonderful '
+    """
+    results = []
+    i=0
+    while i < len(string1):
+        j = 0
+        if find_substring(string1[i:i+sizeAssume], string2):
+            j = 1
+            while j+i < len(string1):
+                if find_substring(string1[i:i+sizeAssume+j], string2) == False or j+i == len(string1) - 1:
+                    results.append(string1[i:i+sizeAssume+j-1])
+                    break
+                j+=1
+        i+=j+1
+    i=0
+    lengs = []
+    for res in results:
+        lengs.append(len(res))
+    maxlen = max(lengs)
+    ind = lengs.index(maxlen)
+    return results[ind]
+
+def nitrogenase_finder(nitro, test_list, sizeAssume):
+    '''
+    >>> nitrogenase_finder('banana', [('test1', 'Holy shit, a banana'), ('test2', 'what a banan yo'), ('test3', 'I just got banned from the game')], 2)
+    [('test1', 'banana'), ('test2', 'banan'), ('test3', 'ban')]
+    '''
+    results = []
+    nitlen = len(nitro)
+    i = 0
+    testlen = len(test_list)
+    for test in test_list:
+        print(i + ' ' + testlen)
+        if nitlen < len(test[1]):
+            long_com_str = longest_common_substring(nitro, test[1], sizeAssume)
+        else:
+            long_com_str = longest_common_substring(test[1], nitro, sizeAssume)
+        results.append((test[0], long_com_str))
+    print(results)
+
 
 if __name__ == "__main__":
     import doctest
-    doctest.testmod()
-    dna = load_seq("./data/X73525.fa")
-    print(gene_finder(dna, 10000))
+    doctest.testmod(verbose=True)
+    #dna = load_seq("./data/X73525.fa")
+    #print(gene_finder(dna, 10000))
+
+#print('This DNA is: EscU/YscU/HrcU family type III secretion system export apparatus switch protein [Salmonella enterica]')
